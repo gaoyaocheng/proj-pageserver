@@ -17,6 +17,7 @@ import CONFIG    # Configuration options. Create by editing CONFIG.base.py
 import argparse  # Command line options (may override some configuration options)
 import socket    # Basic TCP/IP communication on the internet
 import _thread   # Response computation runs concurrently with main program 
+import os
 
 def listen(portnum):
     """
@@ -61,6 +62,7 @@ CAT = """
    =(   )=
 """
 
+
 ## HTTP response codes, as the strings we will actually send. 
 ##   See:  https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
 ##   or    http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
@@ -69,6 +71,14 @@ STATUS_OK = "HTTP/1.0 200 OK\n\n"
 STATUS_FORBIDDEN = "HTTP/1.0 403 Forbidden\n\n"
 STATUS_NOT_FOUND = "HTTP/1.0 404 Not Found\n\n"
 STATUS_NOT_IMPLEMENTED = "HTTP/1.0 401 Not Implemented\n\n"
+def readfile(filename):
+    content = ""
+    try:
+        with open(filename, 'r', encoding='UTF-8') as f:
+            content = f.read()
+    except Exception as err:
+        print(err)
+    return content
 
 def respond(sock):
     """
@@ -81,9 +91,27 @@ def respond(sock):
     print("\nRequest was {}\n".format(request))
 
     parts = request.split()
+    uri = parts[1]
     if len(parts) > 1 and parts[0] == "GET":
-        transmit(STATUS_OK, sock)
-        transmit(CAT, sock)
+        content = readfile(os.getcwd() + "/pages" + uri)
+        print(content)
+        if "~" in uri or ".." in uri:
+            transmit(STATUS_FORBIDDEN, sock)
+            content = "~.."
+        if uri == "/hello.html":
+            if content != "":
+                transmit(STATUS_OK, sock)
+                transmit(content , sock)
+            else:
+                transmit(STATUS_NOT_FOUND, sock)
+        elif parts[1] == "/styles/mystyle.css":
+            if content != "":
+       	        transmit(STATUS_OK, sock)
+                transmit(content, sock)
+            else:
+                transmit(STATUS_NOT_FOUND, sock)
+        if content == "": 
+            transmit(STATUS_NOT_FOUND, sock)
     else:
         transmit(STATUS_NOT_IMPLEMENTED, sock)        
         transmit("\nI don't handle this request: {}\n".format(request), sock)
